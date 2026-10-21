@@ -1,0 +1,21 @@
+{
+  "features": [
+    "days_to_expiry",
+    "quantity_remaining",
+    "discount_pct",
+    "product_id"
+  ],
+  "target": "estimated_gross_margin_simulated",
+  "metrics": {
+    "mae": 33.91416942078938,
+    "rmse": 87.65410544762815,
+    "wape": 0.15666530740823262,
+    "train_rows": 8000,
+    "test_rows": 2000,
+    "train_batches": 1600,
+    "test_batches": 400,
+    "split": "grouped by batch_id to keep scenarios for a batch together",
+    "data_status": "simulated prototype; not evidence of real customer price response"
+  },
+  "data_status": "simulated prototype; not evidence of real customer price response"
+}

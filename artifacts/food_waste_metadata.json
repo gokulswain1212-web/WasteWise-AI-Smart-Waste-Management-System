@@ -1,0 +1,29 @@
+{
+  "features": [
+    "opening_stock",
+    "units_received",
+    "units_sold",
+    "ending_stock_estimate",
+    "unit_price",
+    "discount_pct",
+    "days_to_expiry",
+    "temperature_c",
+    "stockout_flag",
+    "target_day_of_week",
+    "target_month",
+    "product_id",
+    "category"
+  ],
+  "target": "waste_units on the next date for the same product",
+  "metrics": {
+    "mae": 2.7284363425925924,
+    "rmse": 7.008265017622602,
+    "wape": 1.6370618055555555,
+    "train_rows": 1430,
+    "test_rows": 360,
+    "holdout_start": "2026-08-23",
+    "prediction_horizon_days": 1,
+    "split": "chronological by future target date"
+  },
+  "input_alignment": "inventory features from the day before the predicted waste date"
+}

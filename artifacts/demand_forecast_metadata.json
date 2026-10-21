@@ -1,0 +1,38 @@
+{
+  "features": [
+    "day_of_week",
+    "month",
+    "year",
+    "day_of_year",
+    "week_sin",
+    "week_cos",
+    "is_event",
+    "snap",
+    "sell_price",
+    "discount_pct",
+    "promotion",
+    "sales_lag_1",
+    "sales_lag_7",
+    "sales_lag_28",
+    "sales_rolling_mean_7",
+    "sales_rolling_mean_28",
+    "item_id",
+    "dept_id",
+    "cat_id",
+    "store_id"
+  ],
+  "target": "sales",
+  "metrics": {
+    "mae": 0.9204129211208292,
+    "rmse": 1.4089426793708129,
+    "wape": 0.8271477878940051,
+    "lag_7_baseline_wape": 0.988537368179734,
+    "train_rows": 131950,
+    "test_rows": 1960,
+    "series_count": 70,
+    "holdout_start": "2016-04-25",
+    "holdout_end": "2016-05-22",
+    "split": "chronological last 28 calendar days"
+  },
+  "promotion_definition": "current weekly sell price below its value seven days earlier"
+}

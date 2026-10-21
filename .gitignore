@@ -1,0 +1,45 @@
+.env
+backend/.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Protect environment secrets
+.env.*
+!.env.example
+**/.env
+**/.env.*
+
+# Python environments
+.venv/
+venv/
+
+# Frontend dependencies and builds
+node_modules/
+dist/
+build/
+
+# IDE files
+.vscode/
+
+
+# Large trained model artifacts
+artifacts/*.joblib
+
+# Raw training and evaluation datasets
+ml/data/raw/
+
+# Keep placeholder files if needed
+!ml/data/raw/.gitkeep
+
+# Backup files
+*.bak
+*.backup
+*.backup.*
+*_backup.*
+
+# Generated TypeScript build information
+*.tsbuildinfo
+# Temporary frontend backups
+frontend/src/App.backup-*.tsx
+frontend/src/App.before-*.tsx
