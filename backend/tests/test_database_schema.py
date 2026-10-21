@@ -205,12 +205,43 @@ class TestSchemaFile:
         assert "date" in columns
         assert "record_date" not in columns
 
+    def test_forecast_outputs_allow_non_applicable_values(self):
+        sql = _read_file(SCHEMA_PATH)
+        assert re.search(
+            r"`predicted_waste_units`\s+DECIMAL\(10,2\)\s+DEFAULT NULL",
+            sql,
+        )
+        assert (
+            "`predicted_waste_units` IS NULL OR `predicted_waste_units` >= 0"
+            in sql
+        )
+
+    def test_example_environment_files_use_placeholders(self):
+        for path in (ROOT / ".env.example", ROOT / "backend" / ".env.example"):
+            lines = path.read_text(encoding="utf-8").splitlines()
+            for name in (
+                "DATABASE_URL",
+                "MYSQL_ADMIN_URL",
+                "MYSQL_PASSWORD",
+                "MYSQL_ROOT_PASSWORD",
+                "API_KEY",
+                "SECRET_KEY",
+            ):
+                values = [
+                    line.partition("=")[2]
+                    for line in lines
+                    if line.startswith(f"{name}=")
+                ]
+                assert all("CHANGE_ME" in value for value in values), (
+                    f"{name} in {path.name} must use a placeholder"
+                )
+
 
 class TestSeedFile:
     def test_seed_uses_on_duplicate_key_update(self):
         sql = _read_file(SEED_PATH)
         assert "ON DUPLICATE KEY UPDATE" in sql, (
-            "Seed data should use INSERT ... ON DUPLICATE KEY UPDATE for repeatability"
+            "Rows with primary or unique keys should remain repeatable"
         )
 
     def test_seed_has_inserts_for_all_core_tables(self):
@@ -222,17 +253,43 @@ class TestSeedFile:
             )
 
     def test_seed_is_repeatable(self):
-        """Verify every INSERT has a corresponding ON DUPLICATE KEY UPDATE."""
+        """Verify seeds avoid overwrites and duplicate natural-key rows."""
         sql = _read_file(SEED_PATH)
-        # Remove comment lines before counting
-        non_comment_lines = [line for line in sql.splitlines()
-                             if not line.strip().startswith("--")]
-        non_comment_sql = "\n".join(non_comment_lines)
-        insert_count = non_comment_sql.count("INSERT INTO")
-        on_duplicate_count = non_comment_sql.count("ON DUPLICATE KEY UPDATE")
-        assert insert_count == on_duplicate_count, (
-            f"Expected {insert_count} ON DUPLICATE KEY UPDATE clauses, "
-            f"found {on_duplicate_count}"
+        non_comment_sql = "\n".join(
+            line for line in sql.splitlines()
+            if not line.strip().startswith("--")
+        )
+        inserts = re.findall(
+            r"INSERT INTO `(\w+)`.*?;",
+            non_comment_sql,
+            flags=re.DOTALL,
+        )
+        assert inserts == [
+            "products",
+            "inventory_batches",
+            "perishable_inventory",
+            "discount_recommendations",
+            "calendar",
+            "forecast_results",
+        ]
+        assert non_comment_sql.count("ON DUPLICATE KEY UPDATE") == 4
+        assert non_comment_sql.count("WHERE NOT EXISTS") == 2
+        assert "`record_date`" not in non_comment_sql
+        assert "`unit_cost` = VALUES(`unit_cost`)" not in non_comment_sql
+
+        duplicate_clauses = re.findall(
+            r"ON DUPLICATE KEY UPDATE\s+(.*?);",
+            non_comment_sql,
+            flags=re.DOTALL,
+        )
+        assert all(
+            re.fullmatch(r"`(\w+)`\s*=\s*`\1`", clause.strip())
+            for clause in duplicate_clauses
+        )
+        assert all(
+            statement.strip().startswith("INSERT INTO")
+            for statement in non_comment_sql.split(";")
+            if statement.strip()
         )
 
 
@@ -279,33 +336,3 @@ class TestDatabaseIntegration:
                 result = conn.execute(text(f"SELECT COUNT(*) FROM `{table}`"))
                 count = result.scalar()
                 assert count > 0, f"Table '{table}' should have seed data rows"
-
-    def test_seed_data_repeatable(self, mysql_available):
-        """Running seed data twice should not increase row counts."""
-        from sqlalchemy import text
-        with mysql_available.connect() as conn:
-            before_counts = {}
-            for table in ["products", "inventory_batches", "perishable_inventory",
-                          "discount_recommendations"]:
-                result = conn.execute(text(f"SELECT COUNT(*) FROM `{table}`"))
-                before_counts[table] = result.scalar()
-
-            # Read and execute seed data again
-            seed_sql = _read_file(SEED_PATH)
-            for statement in seed_sql.split(";"):
-                statement = statement.strip()
-                if statement and not statement.startswith("--"):
-                    try:
-                        conn.execute(text(statement))
-                    except Exception:
-                        pass
-
-            after_counts = {}
-            for table in ["products", "inventory_batches", "perishable_inventory",
-                          "discount_recommendations"]:
-                result = conn.execute(text(f"SELECT COUNT(*) FROM `{table}`"))
-                after_counts[table] = result.scalar()
-
-            assert before_counts == after_counts, (
-                f"Seed data is not repeatable. Before: {before_counts}, After: {after_counts}"
-            )

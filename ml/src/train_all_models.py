@@ -531,7 +531,15 @@ def train_discount_recommendation() -> dict[str, Any]:
     )
     pipeline.fit(frame[features], frame[target])
 
-    recommendations = frame[["batch_id", "product_id", "days_to_expiry", "quantity_remaining"]].copy()
+    recommendations = frame[
+        [
+            "batch_id",
+            "product_id",
+            "days_to_expiry",
+            "quantity_remaining",
+            "discount_pct",
+        ]
+    ].copy()
     recommendations["predicted_gross_margin_simulated"] = pipeline.predict(
         frame[features]
     )

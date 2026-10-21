@@ -24,7 +24,7 @@ const features = [
   {
     icon: ChartNoAxesCombined,
     title: "Demand Forecasting",
-    description: "Predict future demand with AI-powered accuracy.",
+    description: "Explore demand patterns from historical sales data.",
     color: "forecast",
   },
   {
@@ -36,13 +36,13 @@ const features = [
   {
     icon: BadgePercent,
     title: "Smart Recommendations",
-    description: "Get practical discount suggestions for your inventory.",
+    description: "Review simulated discount scenarios alongside expiry data.",
     color: "recommendations",
   },
   {
     icon: Recycle,
     title: "Waste Reduction",
-    description: "Less waste, lower costs, and a healthier planet.",
+    description: "Review recorded waste and support better stock decisions.",
     color: "reduction",
   },
 ];
@@ -133,7 +133,7 @@ export default function Login({
               <div className="forecast-card">
                 <div className="forecast-heading">
                   <strong>Demand forecast</strong>
-                  <span>Waste reduced <b>−32%</b></span>
+                  <span>Sample visualization</span>
                 </div>
                 <div className="forecast-chart">
                   <span className="chart-gridline" />
@@ -148,8 +148,8 @@ export default function Login({
                   </svg>
                 </div>
                 <div className="forecast-statuses">
-                  <span><i className="status-warning" /> Expiry risk <b>Low</b></span>
-                  <span><i className="status-discount" /> Smart discount <b>20%</b></span>
+                  <span><i className="status-warning" /> Expiry risk <b>Review</b></span>
+                  <span><i className="status-discount" /> Discount scenario <b>Review</b></span>
                 </div>
               </div>
               <div className="produce-card">

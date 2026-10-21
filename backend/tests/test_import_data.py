@@ -14,6 +14,19 @@ ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_SQL = import_data.SCHEMA_PATH.read_text(encoding="utf-8")
 
 
+def sample_products() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "product_id": [1],
+            "product_name": ["Apple"],
+            "category": ["Produce"],
+            "shelf_life_days": [7],
+            "selling_price": [15.0],
+            "unit_cost": [9.0],
+        }
+    )
+
+
 def test_csv_headers_are_compatible_with_reviewed_sql_schema() -> None:
     headers = {}
     for path, table_name in import_data.CSV_TABLES.items():
@@ -25,6 +38,7 @@ def test_csv_headers_are_compatible_with_reviewed_sql_schema() -> None:
 
 def test_csv_rows_satisfy_reviewed_keys_and_check_constraints() -> None:
     datasets = import_data.load_datasets()
+    import_data.validate_dataset_values(datasets)
     products = datasets["products"]
     inventory = datasets["inventory_batches"]
     perishable = datasets["perishable_inventory"]
@@ -69,6 +83,21 @@ def test_import_validation_reports_undefined_table_and_column_errors() -> None:
         )
 
 
+def test_import_rejects_invalid_values_before_database_inspection() -> None:
+    products = sample_products()
+    products.loc[0, "shelf_life_days"] = 0
+    engine = MagicMock()
+
+    with (
+        patch.object(import_data, "inspect") as inspect_database,
+        pytest.raises(ValueError, match="shelf_life_days must be positive"),
+    ):
+        import_data.import_datasets(engine, {"products": products}, SCHEMA_SQL)
+
+    inspect_database.assert_not_called()
+    engine.begin.assert_not_called()
+
+
 def test_discount_scenarios_are_explicitly_excluded_without_a_schema() -> None:
     scenario_path = ROOT / "ml" / "data" / "raw" / "discount_scenarios_simulated (1).csv"
 
@@ -91,7 +120,7 @@ def test_schema_parser_returns_complete_create_statements() -> None:
 
 def test_existing_project_tables_prevent_all_import_writes() -> None:
     engine = MagicMock()
-    datasets = {"products": pd.DataFrame({"product_id": [1]})}
+    datasets = {"products": sample_products()}
     inspector = MagicMock()
     inspector.get_table_names.return_value = ["products"]
 
@@ -112,7 +141,7 @@ def test_new_database_import_appends_after_schema_creation() -> None:
     engine.begin.return_value.__enter__.return_value = connection
     inspector = MagicMock()
     inspector.get_table_names.return_value = []
-    datasets = {"products": pd.DataFrame({"product_id": [1]})}
+    datasets = {"products": sample_products()}
 
     with (
         patch.object(import_data, "inspect", return_value=inspector),

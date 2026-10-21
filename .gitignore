@@ -9,6 +9,7 @@ __pycache__/
 !.env.example
 **/.env
 **/.env.*
+!backend/.env.example
 
 # Python environments
 .venv/

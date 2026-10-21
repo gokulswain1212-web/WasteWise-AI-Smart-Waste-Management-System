@@ -180,7 +180,11 @@ class TestFastAPIIntegration:
 
     def test_health_endpoint_public_no_key(self):
         client = self._make_client()
-        response = client.get("/health")
+        with patch(
+            "app.main.database_status",
+            return_value={"connected": False, "schema_ready": False},
+        ):
+            response = client.get("/health")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "degraded"
@@ -189,7 +193,13 @@ class TestFastAPIIntegration:
 
     def test_health_endpoint_with_key(self):
         client = self._make_client()
-        response = client.get("/health", headers={"X-API-KEY": "test-key-123"})
+        with patch(
+            "app.main.database_status",
+            return_value={"connected": False, "schema_ready": False},
+        ):
+            response = client.get(
+                "/health", headers={"X-API-KEY": "test-key-123"}
+            )
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "degraded"
@@ -203,14 +213,33 @@ class TestFastAPIIntegration:
         )
         assert response.status_code == 200
         assert response.json()["email"] == "manager@example.com"
-        assert "httponly" in response.headers["set-cookie"].lower()
+        set_cookie = response.headers["set-cookie"].lower()
+        assert "httponly" in set_cookie
+        assert "samesite=strict" in set_cookie
+        assert "path=/api/v1" in set_cookie
         assert client.get("/api/v1/auth/session").status_code == 200
         assert client.get("/api/v1/dashboard").status_code != 401
 
         logout_response = client.post("/api/v1/auth/logout")
         assert logout_response.status_code == 200
+        assert "path=/api/v1" in logout_response.headers["set-cookie"].lower()
         assert client.get("/api/v1/auth/session").json()["email"] is None
         assert client.get("/api/v1/dashboard").status_code == 401
+
+    def test_login_cookie_is_secure_in_production(self):
+        client = self._make_client()
+        with patch("app.api.v1.auth.get_settings") as auth_settings:
+            auth_settings.return_value.debug = False
+            response = client.post(
+                "/api/v1/auth/login",
+                json={"email": "manager@example.com", "password": "test-password"},
+            )
+
+        assert response.status_code == 200
+        set_cookie = response.headers["set-cookie"].lower()
+        assert "secure" in set_cookie
+        assert "httponly" in set_cookie
+        assert "samesite=strict" in set_cookie
 
     def test_login_endpoint_rejects_invalid_credentials(self):
         client = self._make_client()

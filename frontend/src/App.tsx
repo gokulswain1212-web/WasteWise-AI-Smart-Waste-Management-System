@@ -12,14 +12,12 @@ import {
   FileBarChart,
   BookOpen,
   Search,
-  Bell,
   Leaf,
   Menu,
   X,
   TrendingUp,
   ArrowUpRight,
   ShieldCheck,
-  BrainCircuit,
   Boxes,
   CalendarDays,
   ChevronRight,
@@ -37,8 +35,13 @@ import {
   Bar,
 } from "recharts";
 import ExpiryRisk from "./pages/ExpiryRisk";
+import DemandForecast from "./pages/DemandForecast";
+import Inventory from "./pages/Inventory";
 import Login from "./pages/Login";
+import Products from "./pages/Products";
 import Recommendations from "./pages/Recommendations";
+import SalesHistory from "./pages/SalesHistory";
+import WasteReports from "./pages/WasteReports";
 import {
   getDashboardSummary,
   type DashboardSummary,
@@ -74,6 +77,21 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    function handleSessionExpired() {
+      setAuthError("Your sign-in session expired. Please sign in again.");
+      setAuthStatus("unauthenticated");
+    }
+
+    window.addEventListener("wastewise:session-expired", handleSessionExpired);
+    return () => {
+      window.removeEventListener(
+        "wastewise:session-expired",
+        handleSessionExpired,
+      );
+    };
+  }, []);
+
   async function handleSignOut() {
     await logout();
     setAuthError(null);
@@ -105,6 +123,7 @@ export default function App() {
 
 const pages = [
   { name: "Dashboard", icon: LayoutDashboard },
+  { name: "Products", icon: Boxes },
   { name: "Inventory Monitoring", icon: Package },
   { name: "Sales History", icon: ShoppingCart },
   { name: "Demand Forecast", icon: ChartNoAxesCombined },
@@ -185,6 +204,35 @@ function Dashboard({ onSignOut }: { onSignOut: () => Promise<void> }) {
   const [dashboardLoading, setDashboardLoading] = useState(true);
 
   useEffect(() => {
+    if (activePage !== "Model Monitoring") return;
+
+    let cancelled = false;
+
+    async function loadMonitoring() {
+      setMonitoringLoading(true);
+      setMonitoringError(null);
+
+      try {
+        const data = await getMonitoring();
+        if (!cancelled) setMonitoring(data);
+      } catch {
+        if (!cancelled) {
+          setMonitoringError(
+            "Could not load monitoring data. Check the backend connection and sign-in session."
+          );
+        }
+      } finally {
+        if (!cancelled) setMonitoringLoading(false);
+      }
+    }
+
+    void loadMonitoring();
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage]);
+
+  useEffect(() => {
     let cancelled = false;
 
     getDashboardSummary()
@@ -206,41 +254,6 @@ function Dashboard({ onSignOut }: { onSignOut: () => Promise<void> }) {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (activePage !== "Model Monitoring") return;
-
-    let cancelled = false;
-
-    async function loadMonitoring() {
-      setMonitoringLoading(true);
-      setMonitoringError(null);
-
-      try {
-        const data = await getMonitoring();
-
-        if (!cancelled) {
-          setMonitoring(data);
-        }
-      } catch {
-        if (!cancelled) {
-          setMonitoringError(
-            "Could not load monitoring data. Check the backend connection."
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setMonitoringLoading(false);
-        }
-      }
-    }
-
-    void loadMonitoring();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activePage]);
 
   const filtered = (dashboard?.expiry_risk_queue ?? []).filter((batch) =>
     `${batch.product_name ?? batch.product_id} ${batch.category ?? ""}`
@@ -298,7 +311,13 @@ function Dashboard({ onSignOut }: { onSignOut: () => Promise<void> }) {
               <Icon size={18} />
               <span>{name}</span>
               {name === "Expiry Risk" && dashboard?.expiry_risk_batches ? (
-                <span className="nav-count">{dashboard.expiry_risk_batches}</span>
+                <span
+                  className="nav-count"
+                  title="Inventory rows with a stored positive expiry-risk label; this is not the live model prediction count."
+                  aria-label={`${dashboard.expiry_risk_batches} inventory rows with stored positive expiry-risk labels`}
+                >
+                  {dashboard.expiry_risk_batches}
+                </span>
               ) : null}
             </button>
           ))}
@@ -312,17 +331,14 @@ function Dashboard({ onSignOut }: { onSignOut: () => Promise<void> }) {
               Use data to make smarter stock decisions and reduce avoidable
               food waste.
             </p>
-            <div className="eco-progress">
-              <span />
-            </div>
-            <small>Waste reduction workspace</small>
+            <small>Decision-support prototype</small>
           </div>
 
           <div className="profile">
             <div className="avatar">WM</div>
             <div className="profile-text">
-              <strong>Store Manager</strong>
-              <span>Administrator</span>
+              <strong>Signed in</strong>
+              <span>WasteWise user</span>
             </div>
             <span className="online-dot" />
           </div>
@@ -360,18 +376,14 @@ function Dashboard({ onSignOut }: { onSignOut: () => Promise<void> }) {
           <div className="topbar-actions">
             <span className="demo-status">
               <span />
-              {dashboard?.data_source === "mysql"
+              {dashboardError
+                ? "DATA ERROR"
+                : dashboard?.data_source === "mysql"
                 ? "MYSQL DATA"
                 : dashboard?.data_source === "local_csv"
                   ? "SAMPLE CSV"
                   : "CONNECTING"}
             </span>
-            <button
-              className="icon-button notification-button"
-              aria-label="Notifications"
-            >
-              <Bell size={19} />
-            </button>
             <div className="top-avatar">WM</div>
             <button
               className="text-button"
@@ -652,77 +664,10 @@ function Dashboard({ onSignOut }: { onSignOut: () => Promise<void> }) {
             </>
           )}
 
-          {activePage === "Inventory Monitoring" && (
-            <Panel
-              title="Expiry-risk inventory batches"
-              subtitle="Risk-labeled records returned by the configured inventory data source"
-            >
-              {dashboardError && <div className="notice" role="alert">{dashboardError}</div>}
-              {dashboardLoading && <p role="status">Loading inventory records...</p>}
-              <InventoryTable
-                items={filtered}
-                search={search}
-                setSearch={setSearch}
-              />
-            </Panel>
-          )}
-
-          {activePage === "Sales History" && (
-            <Panel
-              title="Historical sales"
-              subtitle="Recorded daily units sold in the latest available 7-day data window"
-            >
-              {dashboardError && <div className="notice" role="alert">{dashboardError}</div>}
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>DATE</th>
-                      <th>UNITS SOLD</th>
-                      <th>DATA STATUS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(dashboard?.daily_sales_last_7_days ?? []).map((day) => (
-                      <tr key={day.date}>
-                        <td>{day.date}</td>
-                        <td>{day.units_sold?.toLocaleString() ?? "—"}</td>
-                        <td>
-                          <span className="status status-normal">
-                            {dashboard?.data_source === "mysql" ? "Database" : "Sample CSV"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                    {!dashboardLoading && !dashboard?.daily_sales_last_7_days.length && (
-                      <tr><td colSpan={3} className="empty-state">No sales records are available.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
-          )}
-
-          {activePage === "Demand Forecast" && (
-            <>
-              <Panel
-                title="Demand forecast availability"
-                subtitle="The backend does not yet produce store-specific forward demand estimates"
-              >
-                <div className="notice">
-                  <BrainCircuit size={19} />
-                  <span>
-                    A trained demand model exists, but it was evaluated on a
-                    separate sample dataset and the API has no live
-                    store-specific forecast endpoint. No forecast is shown
-                    rather than presenting sample predictions as operational
-                    advice. Connect this store&apos;s dated sales, calendar,
-                    price, and promotion data to enable this view.
-                  </span>
-                </div>
-              </Panel>
-            </>
-          )}
+          {activePage === "Products" && <Products />}
+          {activePage === "Inventory Monitoring" && <Inventory />}
+          {activePage === "Sales History" && <SalesHistory />}
+          {activePage === "Demand Forecast" && <DemandForecast />}
 
           {activePage === "Expiry Risk" && <ExpiryRisk />}
 
@@ -1021,47 +966,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => Promise<void> }) {
             </>
           )}
 
-          {activePage === "Waste Reports" && (
-            <>
-              <Panel
-                title="Waste overview"
-                subtitle="Recorded waste units by category over the latest 7-day data window"
-              >
-                {dashboardError && <div className="notice" role="alert">{dashboardError}</div>}
-                {dashboard?.waste_by_category_last_7_days.length ? (
-                  <div className="chart-area large-chart">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={dashboard.waste_by_category_last_7_days}>
-                        <CartesianGrid stroke="#263841" strokeDasharray="4 5" />
-                        <XAxis dataKey="category" tick={{ fill: "#8da39e" }} />
-                        <YAxis tick={{ fill: "#8da39e" }} />
-                        <Tooltip />
-                        <Bar
-                          dataKey="waste_units"
-                          name="Recorded waste units"
-                          fill="#60d6a2"
-                          radius={[5, 5, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  !dashboardLoading && (
-                    <p className="empty-state">No categorized waste records are available.</p>
-                  )
-                )}
-              </Panel>
-
-              <div className="notice">
-                <FileBarChart size={18} />
-                <span>
-                  {dashboard?.data_source === "mysql"
-                    ? "Waste quantities come from the connected database. Verify that records represent measured disposals before using them for operational or financial reporting."
-                    : "This view uses supplied CSV sample data. It does not estimate financial impact; use measured waste and verified costs for operational reporting."}
-                </span>
-              </div>
-            </>
-          )}
+          {activePage === "Waste Reports" && <WasteReports />}
 
           {activePage === "Project Conclusion" && (
             <div className="conclusion-grid">
@@ -1129,21 +1034,23 @@ function Dashboard({ onSignOut }: { onSignOut: () => Promise<void> }) {
 function pageDescription(page: string) {
   const descriptions: Record<string, string> = {
     Dashboard:
-      "A clear view of grocery stock, expected demand and food-waste risks.",
+      "A summary of configured inventory snapshots, recorded sales, and waste.",
+    Products:
+      "Review the read-only product catalog from the configured data source.",
     "Inventory Monitoring":
-      "Review current quantities alongside demand and shelf life.",
+      "Review recorded inventory snapshots and conservative expiry statuses.",
     "Sales History":
-      "Explore the historical sales patterns used for demand planning.",
+      "Explore recorded daily sales aggregated from inventory history.",
     "Demand Forecast":
-      "Compare historical sales with future demand estimates.",
+      "View saved-model daily predictions for the M5 benchmark sample, not the configured store.",
     "Expiry Risk":
       "Identify products that may expire before they can be sold.",
     "Smart Recommendations":
       "Turn inventory signals into practical, food-safe actions.",
     "Model Monitoring":
-      "Track model quality and data health when real metrics are connected.",
+      "Review saved model evaluation metrics and historical dataset health.",
     "Waste Reports":
-      "Understand waste quantities and the costs associated with discarded stock.",
+      "Review recorded waste quantities by category and date.",
     "Project Conclusion":
       "Project objectives, evaluation approach, limitations and future scope.",
   };
@@ -1180,7 +1087,7 @@ function InventoryTable({
               <th>QUANTITY REMAINING</th>
               <th>DAYS TO EXPIRY</th>
               <th>EXPECTED DEMAND</th>
-              <th>RISK LABEL</th>
+              <th>SNAPSHOT STATUS</th>
             </tr>
           </thead>
 
@@ -1198,7 +1105,15 @@ function InventoryTable({
                 <td>{batch.days_to_expiry ?? "N/A"}</td>
                 <td>{batch.expected_demand_before_expiry?.toLocaleString() ?? "N/A"}</td>
                 <td>
-                  <span className="status status-warning">At risk</span>
+                  <span className="status status-warning">
+                    {batch.days_to_expiry != null && batch.days_to_expiry < 0
+                      ? "Expired at snapshot — do not sell"
+                      : batch.days_to_expiry === 0
+                        ? "Expires on snapshot date — do not discount"
+                        : batch.days_to_expiry != null && batch.days_to_expiry <= 3
+                          ? "Expiring soon at snapshot"
+                          : "Risk labeled"}
+                  </span>
                 </td>
               </tr>
             ))}

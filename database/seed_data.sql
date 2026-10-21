@@ -2,8 +2,8 @@
 -- WasteWise AI — Seed Data (MySQL 8.4 compatible)
 -- ============================================================
 -- Small, realistic sample dataset for development and testing.
--- Safe to run multiple times: uses INSERT ... ON DUPLICATE KEY UPDATE
--- which updates existing rows instead of duplicating them.
+-- Safe to run multiple times: existing keyed rows are left unchanged, and
+-- rows without a unique key are added only when their natural key is absent.
 -- ============================================================
 
 -- -----------------------------------------------------
@@ -20,10 +20,7 @@ INSERT INTO `products` (
     (1005, 'Apple', 'Produce', 7, 15.00, 9.00),
     (1006, 'Tomato', 'Produce', 5, 20.00, 12.00)
 ON DUPLICATE KEY UPDATE
-    `product_name` = VALUES(`product_name`),
-    `category` = VALUES(`category`),
-    `shelf_life_days` = VALUES(`shelf_life_days`),
-    `selling_price` = VALUES(`selling_price`),
+    `product_id` = `product_id`;
 
 -- -----------------------------------------------------
 -- Seed: inventory_batches
@@ -42,49 +39,42 @@ INSERT INTO `inventory_batches` (
     (5005, 1005, 'Produce', '2026-08-19 08:00:00', '2026-08-19', '2026-08-22', 100, 45, 3, 10.00, 30.00, 15.00, 9.00, 0.00, 0, 0),
     (5006, 1002, 'Dairy', '2026-08-15 08:00:00', '2026-08-16', '2026-08-25', 80, 60, 9, 5.50, 49.50, 25.00, 17.00, 0.00, 0, 0)
 ON DUPLICATE KEY UPDATE
-    `product_id` = VALUES(`product_id`),
-    `category` = VALUES(`category`),
-    `received_at` = VALUES(`received_at`),
-    `snapshot_date` = VALUES(`snapshot_date`),
-    `expiry_date` = VALUES(`expiry_date`),
-    `initial_quantity` = VALUES(`initial_quantity`),
-    `quantity_remaining` = VALUES(`quantity_remaining`),
-    `days_to_expiry` = VALUES(`days_to_expiry`),
-    `avg_daily_sales_7d` = VALUES(`avg_daily_sales_7d`),
-    `expected_demand_before_expiry` = VALUES(`expected_demand_before_expiry`),
-    `unit_price` = VALUES(`unit_price`),
-    `unit_cost` = VALUES(`unit_cost`),
-    `discount_pct` = VALUES(`discount_pct`),
-    `expiry_risk_label` = VALUES(`expiry_risk_label`),
-    `waste_units_actual_simulated` = VALUES(`waste_units_actual_simulated`);
+    `batch_id` = `batch_id`;
 
 -- -----------------------------------------------------
 -- Seed: perishable_inventory
 -- -----------------------------------------------------
 INSERT INTO `perishable_inventory` (
-    `product_id`, `record_date`, `category`, `opening_stock`,
+    `product_id`, `date`, `category`, `opening_stock`,
     `units_received`, `units_sold`, `unit_price`, `discount_pct`,
     `days_to_expiry`, `temperature_c`, `waste_units`, `stockout_flag`
-) VALUES
-    (1001, '2026-04-01', 'Dairy', 27, 0, 6, 32.00, 0.00, 1, 4.10, 0, 0),
-    (1001, '2026-04-02', 'Dairy', 30, 12, 5, 32.00, 0.00, 5, 3.70, 0, 0),
-    (1001, '2026-04-03', 'Dairy', 38, 0, 14, 32.00, 0.00, 2, 4.60, 0, 0),
-    (1001, '2026-04-04', 'Dairy', 49, 0, 11, 32.00, 0.00, 0, 5.70, 0, 0),
-    (1003, '2026-08-21', 'Bakery', 141, 0, 0, 40.00, 10.00, -1, NULL, 0, 0),
-    (1006, '2026-08-16', 'Produce', 72, 0, 10, 45.00, 5.00, 5, 4.20, 2, 0)
-ON DUPLICATE KEY UPDATE
-    `product_id` = VALUES(`product_id`),
-    `record_date` = VALUES(`record_date`),
-    `category` = VALUES(`category`),
-    `opening_stock` = VALUES(`opening_stock`),
-    `units_received` = VALUES(`units_received`),
-    `units_sold` = VALUES(`units_sold`),
-    `unit_price` = VALUES(`unit_price`),
-    `discount_pct` = VALUES(`discount_pct`),
-    `days_to_expiry` = VALUES(`days_to_expiry`),
-    `temperature_c` = VALUES(`temperature_c`),
-    `waste_units` = VALUES(`waste_units`),
-    `stockout_flag` = VALUES(`stockout_flag`);
+)
+SELECT seed.`product_id`, seed.`date`, seed.`category`, seed.`opening_stock`,
+       seed.`units_received`, seed.`units_sold`, seed.`unit_price`,
+       seed.`discount_pct`, seed.`days_to_expiry`, seed.`temperature_c`,
+       seed.`waste_units`, seed.`stockout_flag`
+FROM (
+    SELECT 1001 AS `product_id`, DATE('2026-04-01') AS `date`, 'Dairy' AS `category`,
+           27 AS `opening_stock`, 0 AS `units_received`, 6 AS `units_sold`,
+           32.00 AS `unit_price`, 0.00 AS `discount_pct`, 1 AS `days_to_expiry`,
+           4.10 AS `temperature_c`, 0 AS `waste_units`, 0 AS `stockout_flag`
+    UNION ALL
+    SELECT 1001, DATE('2026-04-02'), 'Dairy', 30, 12, 5, 32.00, 0.00, 5, 3.70, 0, 0
+    UNION ALL
+    SELECT 1001, DATE('2026-04-03'), 'Dairy', 38, 0, 14, 32.00, 0.00, 2, 4.60, 0, 0
+    UNION ALL
+    SELECT 1001, DATE('2026-04-04'), 'Dairy', 49, 0, 11, 32.00, 0.00, 0, 5.70, 0, 0
+    UNION ALL
+    SELECT 1003, DATE('2026-08-21'), 'Bakery', 141, 0, 0, 40.00, 10.00, -1, NULL, 0, 0
+    UNION ALL
+    SELECT 1006, DATE('2026-08-16'), 'Produce', 72, 0, 10, 45.00, 5.00, 5, 4.20, 2, 0
+) AS seed
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM `perishable_inventory` AS existing
+    WHERE existing.`product_id` = seed.`product_id`
+      AND existing.`date` = seed.`date`
+);
 
 -- -----------------------------------------------------
 -- Seed: discount_recommendations
@@ -98,11 +88,7 @@ INSERT INTO `discount_recommendations` (
     (5003, 1001, 3, 3, 10.00, 90.00),
     (5004, 1003, -1, 141, 10.00, 0.00)
 ON DUPLICATE KEY UPDATE
-    `product_id` = VALUES(`product_id`),
-    `days_to_expiry` = VALUES(`days_to_expiry`),
-    `quantity_remaining` = VALUES(`quantity_remaining`),
-    `discount_pct` = VALUES(`discount_pct`),
-    `predicted_gross_margin` = VALUES(`predicted_gross_margin`);
+    `batch_id` = `batch_id`;
 
 -- -----------------------------------------------------
 -- Seed: calendar (sample dates)
@@ -120,11 +106,7 @@ INSERT INTO `calendar` (
     ('2026-08-21', 202633, 'Friday', 6, 8, 2026, NULL, NULL, NULL, NULL, 0, 0, 0),
     ('2026-08-22', 202633, 'Saturday', 7, 8, 2026, NULL, NULL, NULL, NULL, 0, 0, 0)
 ON DUPLICATE KEY UPDATE
-    `wm_yr_wk` = VALUES(`wm_yr_wk`),
-    `weekday` = VALUES(`weekday`),
-    `wday` = VALUES(`wday`),
-    `month` = VALUES(`month`),
-    `year` = VALUES(`year`);
+    `date` = `date`;
 
 -- -----------------------------------------------------
 -- Seed: forecast_results
@@ -132,17 +114,30 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO `forecast_results` (
     `product_id`, `forecast_date`, `target_date`,
     `model_name`, `predicted_waste_units`, `predicted_expiry_risk`
-) VALUES
-    (1001, '2026-08-16', '2026-08-17', 'food_waste', 2.50, NULL),
-    (1003, '2026-08-16', '2026-08-17', 'food_waste', 5.00, NULL),
-    (1006, '2026-08-16', '2026-08-17', 'food_waste', 8.00, NULL),
-    (1001, '2026-08-16', '2026-08-17', 'expiry_risk', NULL, 0.7500),
-    (1003, '2026-08-16', '2026-08-17', 'expiry_risk', NULL, 0.9000),
-    (1006, '2026-08-16', '2026-08-17', 'expiry_risk', NULL, 0.6000)
-ON DUPLICATE KEY UPDATE
-    `forecast_date` = VALUES(`forecast_date`),
-    `target_date` = VALUES(`target_date`),
-    `model_name` = VALUES(`model_name`),
-    `predicted_waste_units` = VALUES(`predicted_waste_units`),
-    `predicted_expiry_risk` = VALUES(`predicted_expiry_risk`);
-    `unit_cost` = VALUES(`unit_cost`);
+)
+SELECT seed.`product_id`, seed.`forecast_date`, seed.`target_date`,
+       seed.`model_name`, seed.`predicted_waste_units`,
+       seed.`predicted_expiry_risk`
+FROM (
+    SELECT 1001 AS `product_id`, DATE('2026-08-16') AS `forecast_date`,
+           DATE('2026-08-17') AS `target_date`, 'food_waste' AS `model_name`,
+           2.50 AS `predicted_waste_units`, NULL AS `predicted_expiry_risk`
+    UNION ALL
+    SELECT 1003, DATE('2026-08-16'), DATE('2026-08-17'), 'food_waste', 5.00, NULL
+    UNION ALL
+    SELECT 1006, DATE('2026-08-16'), DATE('2026-08-17'), 'food_waste', 8.00, NULL
+    UNION ALL
+    SELECT 1001, DATE('2026-08-16'), DATE('2026-08-17'), 'expiry_risk', NULL, 0.7500
+    UNION ALL
+    SELECT 1003, DATE('2026-08-16'), DATE('2026-08-17'), 'expiry_risk', NULL, 0.9000
+    UNION ALL
+    SELECT 1006, DATE('2026-08-16'), DATE('2026-08-17'), 'expiry_risk', NULL, 0.6000
+) AS seed
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM `forecast_results` AS existing
+    WHERE existing.`product_id` = seed.`product_id`
+      AND existing.`forecast_date` = seed.`forecast_date`
+      AND existing.`target_date` = seed.`target_date`
+      AND existing.`model_name` = seed.`model_name`
+);

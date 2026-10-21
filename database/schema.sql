@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS `forecast_results` (
     `forecast_date` DATE NOT NULL,
     `target_date` DATE NOT NULL,
     `model_name` VARCHAR(50) NOT NULL,
-    `predicted_waste_units` DECIMAL(10,2) NOT NULL,
+    `predicted_waste_units` DECIMAL(10,2) DEFAULT NULL,
     `predicted_expiry_risk` DECIMAL(5,4) DEFAULT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`forecast_id`),
@@ -187,7 +187,7 @@ CREATE TABLE IF NOT EXISTS `forecast_results` (
         REFERENCES `products` (`product_id`)
         ON DELETE RESTRICT
         ON UPDATE CASCADE,
-    CONSTRAINT `chk_forecast_results_predicted_waste_non_negative` CHECK (`predicted_waste_units` >= 0),
+    CONSTRAINT `chk_forecast_results_predicted_waste_non_negative` CHECK (`predicted_waste_units` IS NULL OR `predicted_waste_units` >= 0),
     CONSTRAINT `chk_forecast_results_predicted_expiry_risk_range` CHECK (`predicted_expiry_risk` IS NULL OR (`predicted_expiry_risk` >= 0 AND `predicted_expiry_risk` <= 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
